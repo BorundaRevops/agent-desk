@@ -18,6 +18,9 @@
   p{margin:.4rem 0 0}small{color:#adc0d3}.empty{padding:2rem 1rem;color:#adc0d3;border:1px dashed #466079;border-radius:.8rem}
   details summary{cursor:pointer;font-weight:650}.body{white-space:pre-wrap;margin-top:1rem;color:#e7edf5}
   .notice{border-color:#9b7534;background:#3b2d1c}.notice p{color:#f1d79d}
+  .doc-action{border:1px solid #39536d;border-radius:.65rem;background:#1b324d;color:#e7edf5;padding:.55rem .85rem;cursor:pointer;text-align:left}
+  .doc-action:hover{border-color:#8bddf2}.doc-actions{display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;margin-bottom:1rem}
+  .doc-actions a{color:#8bddf2}.doc-frame{display:block;width:100%;min-height:72vh;border:1px solid #304960;border-radius:.85rem;background:#fff}
   footer{color:#9cb1c5;font-size:.8rem;margin-top:2rem}
   @media(prefers-reduced-motion:no-preference){nav button{transition:background .15s,border-color .15s}}
 </style>
@@ -28,13 +31,14 @@
   <footer>Local read-only view · Agents write through the Desk CLI · Refresh this page for current state</footer>
 </main>
 <script>
-const tabs=['Work','Needs you','Messages','Agents','PRs'];let current='Work', data=null;
+const tabs=['Work','Needs you','Messages','Agents','PRs','Library'];let current='Work', data=null, libraryData=null, libraryError=null, selectedDocument=null;
 const nav=document.querySelector('nav'), content=document.querySelector('#content');
 function node(tag,cls,value){const e=document.createElement(tag);if(cls)e.className=cls;if(value!==undefined)e.textContent=value;return e}
 function textOr(value,fallback='—'){return typeof value==='string'&&value.trim()?value:fallback}
 function names(){return new Map((data.lanes||[]).map(l=>[l.lane_id,l.label]))}
 function card(title,meta,body){const e=node('article');e.append(node('h3',null,title),node('div','meta',meta));if(body)e.append(node('p',null,body));return e}
 function empty(message){content.append(node('p','empty',message))}
+function libraryUrl(path){return '/library/'+path.split('/').map(encodeURIComponent).join('/')}
 function render(){nav.replaceChildren();content.replaceChildren();for(const label of tabs){const b=node('button',null,label);b.type='button';if(label===current)b.setAttribute('aria-current','page');b.addEventListener('click',()=>{current=label;render()});nav.append(b)}
  content.append(node('h2',null,current));if(!data?.schema_version){empty('No Desk data is available yet. Run agent-desk init, then register your agents.');return}
  const n=names(), flags=Object.entries(data.truncated||{}).filter(([,v])=>v).map(([k])=>k);if(flags.length){const warning=node('div','notice');warning.append(node('strong',null,'Limited snapshot'),node('p',null,'More '+flags.join(', ')+' exist than this view can show. Use the CLI for a scoped or paged read.'));content.append(warning)}
@@ -43,7 +47,26 @@ function render(){nav.replaceChildren();content.replaceChildren();for(const labe
  if(current==='Messages'){const items=(data.messages||[]).filter(m=>m.current!==false&&m.current!==0&&m.state!=='resolved');content.append(node('p','intro','Current conversations. To reply, use the Desk CLI or ask your agent to relay your response.'));if(!items.length)return empty('No current messages.');for(const m of items){const e=card(textOr(n.get(m.from_lane),'Agent')+' → '+textOr(n.get(m.to_lane),'Agent'),m.state,textOr(m.body,''));content.append(e)}}
  if(current==='Agents'){const items=(data.lanes||[]).filter(l=>l.provider!=='human');if(!items.length)return empty('No agents registered yet.');const grid=node('div','grid');for(const l of items)grid.append(card(textOr(l.label,'Agent'),l.provider+' · '+(l.connected?'Inbox connected':'Check-in needed'),''));content.append(grid)}
  if(current==='PRs'){const items=(data.prs||[]).filter(p=>!p.closed);if(!items.length)return empty('No active PRs tracked.');for(const p of items)content.append(card(textOr(p.title,p.repo+' PR'),p.repo+' · '+p.status+' · '+textOr(n.get(p.owner_lane),'Agent'),''))}
+ if(current==='Library'){
+  if(libraryError)return empty('Library is unavailable: '+libraryError);
+  if(!libraryData)return empty('Loading Library…');
+  const items=libraryData.files||[];
+  if(selectedDocument){
+   const file=items.find(f=>f.path===selectedDocument);
+   if(!file){selectedDocument=null;return empty('That document moved. Refresh to update the Library.')}
+   const actions=node('div','doc-actions'),back=node('button','doc-action','← All documents');back.type='button';back.addEventListener('click',()=>{selectedDocument=null;render()});
+   const alone=node('a',null,'Open alone ↗');alone.href=libraryUrl(file.path);alone.target='_blank';alone.rel='noreferrer';actions.append(back,alone);
+   const frame=node('iframe','doc-frame');frame.title=file.title;frame.setAttribute('sandbox','');frame.referrerPolicy='no-referrer';frame.src=libraryUrl(file.path);
+   content.append(actions,frame);return;
+  }
+  content.append(node('p','intro','Reference documents in '+libraryData.root+'. Add an HTML or Markdown file there, then refresh this page.'));
+  if(libraryData.truncated){const warning=node('div','notice');warning.append(node('strong',null,'Limited Library'),node('p',null,'More documents exist than this view can show. Organize or remove older files.'));content.append(warning)}
+  if(!items.length)return empty('No reference documents yet. Ask an agent to create a designed HTML guide, then choose whether to save it here.');
+  const grid=node('div','grid');for(const file of items){const article=node('article'),open=node('button','doc-action',textOr(file.title));open.type='button';open.addEventListener('click',()=>{selectedDocument=file.path;render()});article.append(open,node('p','meta',file.folder+' · '+file.kind));grid.append(article)}content.append(grid);
+ }
 }
-fetch('/api/snapshot',{credentials:'omit'}).then(r=>{if(!r.ok)throw new Error('Desk is unavailable');return r.json()}).then(v=>{data=v;render()}).catch(e=>{content.replaceChildren(node('p','empty',e.message))});
+const snapshotPromise=fetch('/api/snapshot',{credentials:'omit'}).then(r=>{if(!r.ok)throw new Error('Desk is unavailable');return r.json()});
+const libraryPromise=fetch('/api/library',{credentials:'omit'}).then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}).catch(e=>{libraryError=e.message;return null});
+Promise.all([snapshotPromise,libraryPromise]).then(([snapshot,docs])=>{data=snapshot;libraryData=docs;render()}).catch(e=>{content.replaceChildren(node('p','empty',e.message))});
 </script>
 </html>

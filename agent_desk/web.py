@@ -1,31 +1,57 @@
-"""Read-only local Desk view. It never accepts browser writes."""
+"""Read-only local Desk view and reference library. It accepts no browser writes."""
 
 import argparse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib.resources import files
 import json
 import sys
+from urllib.parse import unquote, urlsplit
 
 from .desk import Desk
+from . import library
+
+APP_CSP = ("default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; "
+           "connect-src 'self'; frame-src 'self'; base-uri 'none'; form-action 'none'")
+DOCUMENT_CSP = ("default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; "
+                "base-uri 'none'; form-action 'none'; sandbox")
 
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        if self.path in ("/", "/index.html"):
-            body = files("agent_desk").joinpath("static/index.html").read_bytes()
-            content_type = "text/html; charset=utf-8"
-        elif self.path == "/api/snapshot":
-            body = json.dumps(Desk().execute("snapshot", {"limit": 1000, "request_history_limit": 1000})).encode()
-            content_type = "application/json; charset=utf-8"
-        else:
+        path = urlsplit(self.path).path
+        try:
+            if path in ("/", "/index.html"):
+                body = files("agent_desk").joinpath("static/index.html").read_bytes()
+                content_type = "text/html; charset=utf-8"
+                csp = APP_CSP
+            elif path == "/api/snapshot":
+                body = json.dumps(Desk().execute("snapshot", {"limit": 1000, "request_history_limit": 1000})).encode()
+                content_type = "application/json; charset=utf-8"
+                csp = APP_CSP
+            elif path == "/api/library":
+                body = json.dumps(library.list_documents()).encode()
+                content_type = "application/json; charset=utf-8"
+                csp = APP_CSP
+            elif path.startswith("/library/"):
+                relative = unquote(path[len("/library/"):], encoding="utf-8", errors="strict")
+                kind, body = library.read_document(relative)
+                content_type = "text/html; charset=utf-8" if kind == "html" else "text/plain; charset=utf-8"
+                csp = DOCUMENT_CSP
+            else:
+                self.send_error(404)
+                return
+        except (FileNotFoundError, UnicodeError):
             self.send_error(404)
+            return
+        except (OSError, ValueError, json.JSONDecodeError):
+            self.send_error(500)
             return
         self.send_response(200)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
-        self.send_header("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'none'")
+        self.send_header("Content-Security-Policy", csp)
         self.end_headers()
         self.wfile.write(body)
 

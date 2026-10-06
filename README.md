@@ -19,7 +19,7 @@ agent-desk doctor
 agent-desk serve
 ```
 
-Open `http://127.0.0.1:8766`. The view is local and read-only. The ledger lives at `~/.local/state/agent-desk/coordination.sqlite3` by default with owner-only file permissions. Set `AGENT_DESK_HOME` before initialization to choose another private state directory. Never commit the database or config.
+Open `http://127.0.0.1:8766`. The view is local and read-only. The **Library** tab lists local HTML and Markdown reference documents. By default, `init` creates `~/Desktop/Agent Desk/Library` (or `~/Agent Desk/Library` when there is no Desktop). Choose another dedicated folder with `agent-desk init --library-root /absolute/path`; `agent-desk doctor` reports the effective folder. Library files remain local and are not synced or published by this starter. The ledger lives at `~/.local/state/agent-desk/coordination.sqlite3` by default with owner-only file permissions. Set `AGENT_DESK_HOME` before initialization to choose another private state directory. Never commit the database or config.
 
 To have Codex or Claude set up your team, point it at this checkout and say:
 
@@ -31,7 +31,7 @@ That explicit request lets the setup agent create or bind the conversations. It 
 
 The repository's `AGENTS.md` and `CLAUDE.md` apply only while an agent is working in this checkout. During setup, have the setup agent locate and update the **active personal/global instruction file** for each agent tool you use (for example, Codex's global `AGENTS.md` or Claude's global `CLAUDE.md`). Preserve its existing instructions, add the absolute path to this checkout, and include this rule:
 
-> For each new agent conversation doing work managed in Agent Desk, read `skills/desk-agent/SKILL.md` from my Agent Desk checkout. Register your **real** provider, conversation ID, and host in Desk before taking ownership. Give your lane a stable, human-readable name that says what you own; use the same name for the chat or task when the tool allows it. Reuse an existing matching lane, and bind only workstreams actually assigned to you. If Desk or the real conversation ID is unavailable, say so instead of inventing a lane or claiming that delivery is connected.
+> For each new agent conversation doing work managed in Agent Desk, read `skills/desk-agent/SKILL.md` from my Agent Desk checkout. Register your **real** provider, conversation ID, and host in Desk before taking ownership. Give your lane a stable, human-readable name that says what you own; use the same name for the chat or task when the tool allows it. Reuse an existing matching lane, and bind only workstreams actually assigned to you. If Desk or the real conversation ID is unavailable, say so instead of inventing a lane or claiming that delivery is connected. For explanations worth keeping, read `skills/desk-reference-docs/SKILL.md`: offer a useful visual or designed HTML reference, and offer to save an approved document in my local Desk Library.
 
 The setup agent should show you the exact global-file change and verify one real lane registration. Each agent registers its own conversation; a shared CoS or Desk Manager registration does not cover other agents.
 
@@ -77,6 +77,7 @@ This transport is optional and machine-specific. If `agent-desk doctor` says `co
 - [Desk Dispatcher](skills/desk-dispatcher/SKILL.md) routes bounded event batches without taking over owner work.
 - [Desk Agent](skills/desk-agent/SKILL.md) enrolls and handles its own inbox.
 - [Desk recovery](skills/desk-recover/SKILL.md) checks the exact existing installation after a restart.
+- [Desk reference docs](skills/desk-reference-docs/SKILL.md) guides visual explanations, standalone HTML references, and local Library storage.
 - [Chief of Staff protocol](docs/chief-of-staff.md) describes coordination and evidence boundaries.
 
 Skills are ordinary Markdown in this repository. Ask your agent to read the relevant file from the checkout; installing them into a personal skill directory is optional.

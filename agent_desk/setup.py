@@ -10,6 +10,7 @@ import sys
 import uuid
 
 from .desk import Desk, DeskError, DEFAULT_DB, STATE_DIR
+from . import library
 
 CONFIG = STATE_DIR / "config.json"
 
@@ -32,17 +33,24 @@ def load_config():
     return value
 
 
-def init(name, host_id):
+def init(name, host_id, library_root=None):
     if CONFIG.exists():
         value = load_config()
-        print(json.dumps({"config": str(CONFIG), "db": str(DEFAULT_DB), "human_lane": value["human_lane"], "already_initialized": True}))
+        chosen = library.ensure_root(library_root or value.get("library_root") or library.default_root())
+        if value.get("library_root") != str(chosen):
+            value["library_root"] = str(chosen)
+            _write_json(CONFIG, value)
+        print(json.dumps({"config": str(CONFIG), "db": str(DEFAULT_DB), "human_lane": value["human_lane"],
+                          "library_root": str(chosen), "already_initialized": True}))
         return 0
+    chosen = library.ensure_root(library_root or library.default_root())
     human = Desk().execute("lane-register", {
         "provider": "human", "session_id": "owner", "host_id": host_id, "label": name
     })
     value = {
         "schema_version": 1,
         "human_lane": human["lane_id"],
+        "library_root": str(chosen),
         "dispatcher_lane": None,
         "dispatcher_thread": None,
         "dispatch_enabled": False,
@@ -54,7 +62,8 @@ def init(name, host_id):
         "quiet_end_hour": 8,
     }
     _write_json(CONFIG, value)
-    print(json.dumps({"config": str(CONFIG), "db": str(DEFAULT_DB), "human_lane": human["lane_id"], "already_initialized": False}))
+    print(json.dumps({"config": str(CONFIG), "db": str(DEFAULT_DB), "human_lane": human["lane_id"],
+                      "library_root": str(chosen), "already_initialized": False}))
     return 0
 
 
@@ -100,6 +109,8 @@ def doctor():
     result = {
         "db_exists": DEFAULT_DB.exists(),
         "config": str(CONFIG),
+        "library_root": str(library.configured_root()),
+        "library_documents": len(library.list_documents()["files"]),
         "human_registered": any(l["lane_id"] == config["human_lane"] for l in snapshot["lanes"]),
         "dispatcher_configured": bool(config.get("dispatcher_thread") and config.get("dispatcher_lane")),
         "dispatch_enabled": bool(config.get("dispatch_enabled")),
@@ -117,6 +128,7 @@ def main(argv=None):
     first = sub.add_parser("init", help="create a local ledger and human lane")
     first.add_argument("--name", default="You", help="display name for the human lane")
     first.add_argument("--host-id", default="local", help="stable name for this installation")
+    first.add_argument("--library-root", help="local HTML/Markdown folder (default: Desktop/Agent Desk/Library when Desktop exists)")
     bind = sub.add_parser("configure-dispatcher", help="bind a real, existing Codex task")
     bind.add_argument("--thread", required=True)
     bind.add_argument("--label", default="Desk Dispatcher")
@@ -125,11 +137,11 @@ def main(argv=None):
     args = parser.parse_args(argv)
     try:
         if args.command == "init":
-            return init(args.name, args.host_id)
+            return init(args.name, args.host_id, args.library_root)
         if args.command == "configure-dispatcher":
             return configure_dispatcher(args.thread, args.label, args.codex_path)
         return doctor()
-    except (DeskError, OSError, KeyError) as exc:
+    except (DeskError, OSError, KeyError, ValueError) as exc:
         print(json.dumps({"error": str(exc)}), file=sys.stderr)
         return 2
 

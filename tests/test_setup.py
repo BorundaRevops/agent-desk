@@ -14,8 +14,8 @@ class SetupRoundTrip(unittest.TestCase):
             with patch.object(desk, "DEFAULT_DB", base / "ledger.sqlite3"), \
                  patch.object(setup, "DEFAULT_DB", base / "ledger.sqlite3"), \
                  patch.object(setup, "CONFIG", base / "config.json"):
-                self.assertEqual(setup.init("You", "local"), 0)
-                self.assertEqual(setup.init("Another label", "local"), 0)
+                self.assertEqual(setup.init("You", "local", base / "Library"), 0)
+                self.assertEqual(setup.init("Another label", "local", base / "Library"), 0)
                 thread = str(uuid.uuid4())
                 self.assertEqual(setup.configure_dispatcher(thread, "Dispatcher"), 0)
                 self.assertEqual(setup.configure_dispatcher(thread, "Dispatcher"), 0)
