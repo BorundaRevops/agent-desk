@@ -5,7 +5,7 @@ description: Enroll a real agent conversation in Agent Desk and handle its scope
 
 # Work with Desk
 
-Register your actual provider, conversation ID, host, and readable label with `lane-register`. Reuse an existing matching lane. Bind only workstreams the user or Desk Manager actually assigned to you. If you have a real inbox watcher, register its consumer and test the full wake → claim → accept → resolution loop before calling delivery connected. A manual consumer is honest when no watcher exists.
+Register your actual provider, conversation ID, host, and a stable, human-readable lane name with `lane-register`. Name your chat or task the same way when your tool supports it. Reuse an existing lane only when its provider, conversation ID, and host match your own. Bind only workstreams the user or Desk Manager actually assigned to you. If you have a real inbox watcher, register its consumer and test the full wake → claim → accept → resolution loop before calling delivery connected. A manual consumer is honest when no watcher exists.
 
 Read your scoped snapshot with `agent-desk snapshot --json '{"lane_id":"YOUR_LANE_ID","limit":1000}'`. Use an exclusive `inbox-claim` lease and the returned claim ID. Explicitly `message-accept` before handling a message. Use `message-reply` for an answer that must continue the same conversation or `message-done` for an FYI, then `inbox-release`. Neither reading nor queue consumption means the work is complete.
 

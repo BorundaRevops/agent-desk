@@ -23,9 +23,17 @@ Open `http://127.0.0.1:8766`. The view is local and read-only. The ledger lives 
 
 To have Codex or Claude set up your team, point it at this checkout and say:
 
-> Read `AGENTS.md` and `skills/desk-setup/SKILL.md`. Set up Agent Desk for my existing work, using real chat identities. Establish a Desk Manager and a separate Codex dispatcher task if the tools on this machine support it. Keep delivery disabled until you test the exact target.
+> Read `AGENTS.md` and `skills/desk-setup/SKILL.md`. Set up Agent Desk for my existing work, using real chat identities. Establish a Desk Manager and a separate Codex dispatcher task if the tools on this machine support it. Update my active global agent instructions so each future agent registers its own real conversation and names its lane. Preserve my existing instructions. Keep delivery disabled until you test the exact target.
 
 That explicit request lets the setup agent create or bind the conversations. It must not guess a session ID or silently turn on a watcher. Your Chief of Staff can be a separate agent or one of your existing conversations; see [the CoS protocol](docs/chief-of-staff.md).
+
+### Make enrollment stick
+
+The repository's `AGENTS.md` and `CLAUDE.md` apply only while an agent is working in this checkout. During setup, have the setup agent locate and update the **active personal/global instruction file** for each agent tool you use (for example, Codex's global `AGENTS.md` or Claude's global `CLAUDE.md`). Preserve its existing instructions, add the absolute path to this checkout, and include this rule:
+
+> For each new agent conversation doing work managed in Agent Desk, read `skills/desk-agent/SKILL.md` from my Agent Desk checkout. Register your **real** provider, conversation ID, and host in Desk before taking ownership. Give your lane a stable, human-readable name that says what you own; use the same name for the chat or task when the tool allows it. Reuse an existing matching lane, and bind only workstreams actually assigned to you. If Desk or the real conversation ID is unavailable, say so instead of inventing a lane or claiming that delivery is connected.
+
+The setup agent should show you the exact global-file change and verify one real lane registration. Each agent registers its own conversation; a shared CoS or Desk Manager registration does not cover other agents.
 
 ## What the ledger records
 
