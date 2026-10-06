@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Agent Desk</title>
+<style>
+  :root{font:16px/1.5 system-ui,-apple-system,sans-serif;color:#e7edf5;background:#0d1725}
+  *{box-sizing:border-box}body{margin:0}button{font:inherit}button:focus-visible{outline:3px solid #64c8ef;outline-offset:3px}
+  header{padding:1.3rem max(1.2rem,calc((100vw - 1050px)/2));border-bottom:1px solid #294056;background:#12243a}
+  h1{margin:0;font-size:1.35rem;letter-spacing:-.03em}header p{margin:.3rem 0 0;color:#afc0d2;font-size:.9rem}
+  main{max-width:1050px;margin:auto;padding:1.5rem 1.2rem 4rem}
+  nav{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1.5rem}nav button{border:1px solid #39536d;border-radius:.65rem;background:#1b324d;color:#dce8f4;padding:.55rem .95rem;cursor:pointer}
+  nav button[aria-current="page"]{background:#8bddf2;border-color:#8bddf2;color:#092238;font-weight:700}
+  h2{font-size:1.55rem;letter-spacing:-.03em;margin:0 0 1rem}h3{font-size:1.05rem;margin:.1rem 0 .5rem}
+  .intro{color:#b6c7d9;margin:-.4rem 0 1.35rem}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:.85rem}
+  article,details,.notice{border:1px solid #304960;background:#172b42;border-radius:.85rem;padding:1rem;margin-bottom:.8rem}
+  .meta{font-size:.8rem;color:#adc0d3;display:flex;gap:.65rem;flex-wrap:wrap}.state{font-size:.7rem;letter-spacing:.04em;text-transform:uppercase;color:#8bddf2;font-weight:800}
+  p{margin:.4rem 0 0}small{color:#adc0d3}.empty{padding:2rem 1rem;color:#adc0d3;border:1px dashed #466079;border-radius:.8rem}
+  details summary{cursor:pointer;font-weight:650}.body{white-space:pre-wrap;margin-top:1rem;color:#e7edf5}
+  .notice{border-color:#9b7534;background:#3b2d1c}.notice p{color:#f1d79d}
+  footer{color:#9cb1c5;font-size:.8rem;margin-top:2rem}
+  @media(prefers-reduced-motion:no-preference){nav button{transition:background .15s,border-color .15s}}
+</style>
+<header><h1>Agent Desk</h1><p>Your local view of work, decisions, agents, and conversations.</p></header>
+<main>
+  <nav aria-label="Desk views"></nav>
+  <section id="content" aria-live="polite"><p>Loading Desk…</p></section>
+  <footer>Local read-only view · Agents write through the Desk CLI · Refresh this page for current state</footer>
+</main>
+<script>
+const tabs=['Work','Needs you','Messages','Agents','PRs'];let current='Work', data=null;
+const nav=document.querySelector('nav'), content=document.querySelector('#content');
+function node(tag,cls,value){const e=document.createElement(tag);if(cls)e.className=cls;if(value!==undefined)e.textContent=value;return e}
+function textOr(value,fallback='—'){return typeof value==='string'&&value.trim()?value:fallback}
+function names(){return new Map((data.lanes||[]).map(l=>[l.lane_id,l.label]))}
+function card(title,meta,body){const e=node('article');e.append(node('h3',null,title),node('div','meta',meta));if(body)e.append(node('p',null,body));return e}
+function empty(message){content.append(node('p','empty',message))}
+function render(){nav.replaceChildren();content.replaceChildren();for(const label of tabs){const b=node('button',null,label);b.type='button';if(label===current)b.setAttribute('aria-current','page');b.addEventListener('click',()=>{current=label;render()});nav.append(b)}
+ content.append(node('h2',null,current));if(!data?.schema_version){empty('No Desk data is available yet. Run agent-desk init, then register your agents.');return}
+ const n=names(), flags=Object.entries(data.truncated||{}).filter(([,v])=>v).map(([k])=>k);if(flags.length){const warning=node('div','notice');warning.append(node('strong',null,'Limited snapshot'),node('p',null,'More '+flags.join(', ')+' exist than this view can show. Use the CLI for a scoped or paged read.'));content.append(warning)}
+ if(current==='Work'){const items=(data.cards||[]).filter(c=>c.state!=='completed');content.append(node('p','intro','Current work and its next step. A completed task needs explicit owner confirmation.'));if(!items.length)return empty('No work cards yet. Ask your Desk Manager to register a project and workstream.');const grid=node('div','grid');for(const c of items){const e=card(textOr(c.title),c.state+' · '+textOr(n.get(c.owner_lane),'Agent'),textOr(c.summary,''));if(c.next_step)e.append(node('p',null,'Next: '+c.next_step));grid.append(e)}content.append(grid)}
+ if(current==='Needs you'){const items=(data.requests||[]).filter(r=>['open','conflict'].includes(r.state));content.append(node('p','intro','Decisions and follow-ups saved by your agents. Respond in your agent chat; the owner verifies completion.'));if(!items.length)return empty('No open requests.');for(const r of items){const e=node('details');e.append(node('summary',null,textOr(r.title)));e.append(node('div','meta',r.state+' · '+textOr(n.get(r.owner_lane),'Agent')));e.append(node('p','body',textOr(r.body,'')));content.append(e)}}
+ if(current==='Messages'){const items=(data.messages||[]).filter(m=>m.current!==false&&m.current!==0&&m.state!=='resolved');content.append(node('p','intro','Current conversations. To reply, use the Desk CLI or ask your agent to relay your response.'));if(!items.length)return empty('No current messages.');for(const m of items){const e=card(textOr(n.get(m.from_lane),'Agent')+' → '+textOr(n.get(m.to_lane),'Agent'),m.state,textOr(m.body,''));content.append(e)}}
+ if(current==='Agents'){const items=(data.lanes||[]).filter(l=>l.provider!=='human');if(!items.length)return empty('No agents registered yet.');const grid=node('div','grid');for(const l of items)grid.append(card(textOr(l.label,'Agent'),l.provider+' · '+(l.connected?'Inbox connected':'Check-in needed'),''));content.append(grid)}
+ if(current==='PRs'){const items=(data.prs||[]).filter(p=>!p.closed);if(!items.length)return empty('No active PRs tracked.');for(const p of items)content.append(card(textOr(p.title,p.repo+' PR'),p.repo+' · '+p.status+' · '+textOr(n.get(p.owner_lane),'Agent'),''))}
+}
+fetch('/api/snapshot',{credentials:'omit'}).then(r=>{if(!r.ok)throw new Error('Desk is unavailable');return r.json()}).then(v=>{data=v;render()}).catch(e=>{content.replaceChildren(node('p','empty',e.message))});
+</script>
+</html>
